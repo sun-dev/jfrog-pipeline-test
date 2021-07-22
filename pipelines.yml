@@ -18,7 +18,7 @@ resources:
   - name: mock_custta_input_props
     type: PropertyBag
     configuration:
-      sync_cl: 0
+      sync_cl: 1
 
   - name: mock_custta_sync_output_props
     type: PropertyBag
