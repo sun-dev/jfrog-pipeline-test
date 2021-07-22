@@ -141,5 +141,5 @@ pipelines:
             - name: mock_custta_build_output_props
         execution:
             onExecute:
-                - 'cd ${WORKSPACE}/HEAD/src/ext/zlib/gradle_build'
+                - 'cd ${WORKSPACE}/HEAD/hierdesign/gradle/cust-ta'
                 - './gradlew build --gradle-user-home ${GRADLE_USER_HOME}'
