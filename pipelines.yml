@@ -1,0 +1,144 @@
+template: true   # required for local templates
+valuesFilePath: ./values.yml
+
+resources:
+  - name: cust_ta_mock_pipeline_repo
+    type: GitRepo
+    configuration:
+      gitProvider: {{ .Values.myRepo.gitProvider }}
+      path: {{ .Values.myRepo.path }}
+      branches:
+        include: main
+
+  - name: mock_custta_cron
+    type: CronTrigger
+    configuration:
+      interval: '0 */5 * * *'     # Every 5 minutes
+
+  - name: mock_custta_input_props
+    type: PropertyBag
+    configuration:
+      sync_cl: 0
+
+  - name: mock_custta_sync_output_props
+    type: PropertyBag
+    configuration:
+      sync_cl: 0
+
+  - name: mock_custta_build_output_props
+    type: PropertyBag
+    configuration:
+      build_number: 0
+
+pipelines:
+  - name: mock_custta
+    configuration:
+      nodePool: SW-Linux-CentOS7
+    steps:
+      - name: sync
+        type: Bash
+        configuration:
+          runtime: &docker_runtime
+            type: image
+            image:
+              custom:
+                name: xcoartifactory.xilinx.com/devops/centos7.4_zlib_pipeline
+                tag: latest
+                # Adding batonroot so we can get to p4
+                options: "-v /tools/batonroot:/tools/batonroot -v /home/xbuild:/home/xbuild -v /proj/rdi/staff:/proj/rdi/staff -v /proj/xcohdstaff1:/proj/xcohdstaff1 -v /scratch:/scratch"
+                autoPull: true
+                registry: docker_xcoartifactory
+          # This will run on the nodePool but not in a container (i.e. it will not run on xcodocker01)
+          #runtime:
+          #  type: host
+          inputResources:
+            - name: mock_custta_cron
+            - name: cust_ta_mock_pipeline_repo
+          outputResources:
+            - name: mock_custta_sync_output_props
+          environmentVariables:
+            WORKSPACE: '/scratch/pipeline_mock_custta_testing'
+            P4CONFIG: '.p4config'
+            P4CLIENT: 'pipeline_mock_custta_testing'
+        execution:
+          onExecute:
+            #- add_run_variables user_name=xbuild
+            #- add_run_variables user_id=65673
+            #- add_run_variables group_id=10115
+            - echo "Printing user, expected to be root..."
+            - id
+            - echo "Adding xbuild user..."
+            - groupadd -g 10115 hd
+            - useradd -l -u 65673 -g hd xbuild
+            - echo "Trying su -c to xbuild user..."
+            - su xbuild -c id
+            #- echo "Switching to xbuild user..."
+            #- su xbuild
+            - echo "Printing user, expected to be xbuild..."
+            - id
+            - echo "PWD..."
+            - pwd
+            - echo "LS..."
+            - ls
+            - echo "HOSTNAME..."
+            - hostname
+            #- USER=xbuild
+            #- HOME=/home/xbuild
+            - 'su xbuild -c "mkdir -p ${WORKSPACE}"'
+            - 'cd ${WORKSPACE}'
+            #this might not need it
+            #- 'su xbuild -c "/tools/batonroot/rodin/devkits/lnx64/perforce-2018.1/bin/p4 client -o RDI_HEAD_ext_zlib_component_template > ${P4CLIENT}.log"'
+            - 'su xbuild -c "/tools/batonroot/rodin/devkits/lnx64/perforce-2018.1/bin/p4 client -o RDI_HEAD_base_component_template > ${P4CLIENT}.log"'
+            - 'sed "s|Root:.*|Root:\t${WORKSPACE}|" -i ${P4CLIENT}.log'
+            - 'sed "s|RDI_HEAD_base_component_template|${P4CLIENT}|g" -i ${P4CLIENT}.log'
+            - 'echo "\t//Rodin/HEAD/hierdesign/gradle/cust-ta/... //${P4CLIENT}/HEAD/hierdesign/gradle/cust-ta/..." >> ${P4CLIENT}.log'
+            #- 'su xbuild -c "/tools/batonroot/rodin/devkits/lnx64/perforce-2018.1/bin/p4 client -o RDI_HEAD_base_component_template | grep // | sed "s:RDI_HEAD_base_component_template:${P4CLIENT}:" >> ${P4CLIENT}.log"'
+            - 'su xbuild -c "cat ${P4CLIENT}.log | /tools/batonroot/rodin/devkits/lnx64/perforce-2018.1/bin/p4 client -i"'
+            # TODO: Force the sync for now, but we should consider using the -k or some other strategy long-term
+            - su xbuild -c "/tools/batonroot/rodin/devkits/lnx64/perforce-2018.1/bin/p4 sync -f --parallel=threads=10 ..."
+            #- echo "Workspace..."
+            #- echo $workspace_dir
+            #- add_run_variables workspace_id="pipelines_${step_node_name}_${pipeline_name}_${run_id}"
+            #- echo "Setting up ephemeral Perforce workspace: ${workspace_id}"
+            #- add_run_variables workspace_dir="/scratch/pipelines/${workspace_id}/{{ .Values.branch.perforce }}"
+            #- echo "Creating workspace dir: ${workspace_id}"
+            #- mkdir -p $workspace_dir
+            #- cd $workspace_dir
+            #- p4 login -s
+            # The next two commands add variables to run state, which is available to all downstream steps in this run
+            # Run state documentation: https://www.jfrog.com/confluence/display/JFROG/Creating+Stateful+Pipelines#CreatingStatefulPipelines-RunState
+            #- add_run_variables current_runid=$run_id
+            #- add_run_variables commitSha=$res_exampleRepo_commitSha
+            #- add_run_variables current_failAt=$fail_at
+            # This variable is written to pipeline state in ext_boost_s3.
+            # So this will be empty during first run and will be set to prior run number in subsequent runs
+            # Pipeline state documentation: https://www.jfrog.com/confluence/display/JFROG/Creating+Stateful+Pipelines#CreatingStatefulPipelines-PipelineState
+            #- echo "Previous run ID is $prev_runid"
+            #- echo "Checking if we should fail..."
+            #- 'echo "Current fail_at is: $fail_at"'
+            #- fail_at_array=(${fail_at})
+            #- '! [[ "${fail_at_array[@]}" =~ "${pipeline_name}" ]]'
+            - write_output mock_custta_sync_output_props sync_cl=123123
+
+      - name: build
+        type: Bash
+        configuration:
+          runtime: *docker_runtime
+          environmentVariables:
+            IS_CI: 'true'
+            WORKSPACE: '/scratch/pipeline_mock_custta_testing'
+            ENVROOT: '/scratch/pipeline_mock_custta_testing/HEAD/hierdesign'
+            GRADLE_USER_HOME: '/scratch/pipeline_mock_custta_testing/.gradle-user-home'
+            RDI_ROOT: '/scratch/pipeline_mock_custta_testing/HEAD'
+            SW_TESTS: '/scratch/pipeline_mock_custta_testing/regression'
+            RDI_MAKEROOT: '/scratch/pipeline_mock_custta_testing/rdi/makefiles'
+            RDI_SITE: 'XCO'
+            RDI_SRCROOT: '/scratch/pipeline_mock_custta_testing/HEAD/src'
+          inputSteps:
+            - name: sync
+          outputResources:
+            - name: mock_custta_build_output_props
+        execution:
+            onExecute:
+                - 'cd ${WORKSPACE}/HEAD/src/ext/zlib/gradle_build'
+                - './gradlew build --gradle-user-home ${GRADLE_USER_HOME}'
