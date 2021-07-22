@@ -91,7 +91,7 @@ pipelines:
             - 'su xbuild -c "/tools/batonroot/rodin/devkits/lnx64/perforce-2018.1/bin/p4 client -o RDI_HEAD_base_component_template > ${P4CLIENT}.log"'
             - 'sed "s|Root:.*|Root:\t${WORKSPACE}|" -i ${P4CLIENT}.log'
             - 'sed "s|RDI_HEAD_base_component_template|${P4CLIENT}|g" -i ${P4CLIENT}.log'
-            - 'echo "\t//Rodin/HEAD/hierdesign/gradle/cust-ta/... //${P4CLIENT}/HEAD/hierdesign/gradle/cust-ta/..." >> ${P4CLIENT}.log'
+            - 'echo -e "\t//Rodin/HEAD/hierdesign/gradle/cust-ta/... //${P4CLIENT}/HEAD/hierdesign/gradle/cust-ta/..." >> ${P4CLIENT}.log'
             - 'cat "${P4CLIENT}.log"'
             #- 'su xbuild -c "/tools/batonroot/rodin/devkits/lnx64/perforce-2018.1/bin/p4 client -o RDI_HEAD_base_component_template | grep // | sed "s:RDI_HEAD_base_component_template:${P4CLIENT}:" >> ${P4CLIENT}.log"'
             - 'su xbuild -c "cat ${P4CLIENT}.log | /tools/batonroot/rodin/devkits/lnx64/perforce-2018.1/bin/p4 client -i"'
