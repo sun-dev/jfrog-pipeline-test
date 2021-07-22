@@ -1,0 +1,5 @@
+myRepo:
+  gitProvider: sun_ghe_integration
+  path: sunskali/jfrog-cust-ta-mock
+branch:
+  perforce: HEAD
